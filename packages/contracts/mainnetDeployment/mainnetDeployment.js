@@ -9,7 +9,7 @@ const { ChainlinkAggregatorV3Interface } = require("./ABIs/ChainlinkAggregatorV3
 // 一些本地写的测试工具集
 const { TestHelper: th, TimeValues: timeVals } = require("../utils/testHelpers.js")
 const { dec } = th
-// 一些本地写的部署工具集
+// 一些本地写的部署工具集（已讲解过）
 const MainnetDeploymentHelper = require("../utils/mainnetDeploymentHelpers.js")
 const toBigNum = ethers.BigNumber.from
 
@@ -22,18 +22,23 @@ async function mainnetDeploy(configParams) {
   // 利用第一个账户来部署合约
   const deployerWallet = (await ethers.getSigners())[0]
   // const account2Wallet = (await ethers.getSigners())[1]
+  // 载入本地部署工具集
   const mdh = new MainnetDeploymentHelper(configParams, deployerWallet)
+  // 获取设置的gas price值
   const gasPrice = configParams.GAS_PRICE
-
+  // 读已部署信息，如果未部署过为空值
   const deploymentState = mdh.loadPreviousDeployment()
 
+  // 输出deployer地址并比较该地址是否是与配置文件中写的一致
   console.log(`deployer address: ${deployerWallet.address}`)
   assert.equal(deployerWallet.address, configParams.liquityAddrs.DEPLOYER)
   // assert.equal(account2Wallet.address, configParams.beneficiaries.ACCOUNT_2)
+
+  // 获取当前deployer的eth余额
   let deployerETHBalance = await ethers.provider.getBalance(deployerWallet.address)
   console.log(`deployerETHBalance before: ${deployerETHBalance}`)
 
-  // Get UniswapV2Factory instance at its deployed address
+  // 根据uniswapV2Factory地址（配置文件中有），获取ethers.js的contract对象
   const uniswapV2Factory = new ethers.Contract(
     configParams.externalAddrs.UNISWAP_V2_FACTORY,
     UniswapV2Factory.abi,
@@ -41,78 +46,96 @@ async function mainnetDeploy(configParams) {
   )
 
   console.log(`Uniswp addr: ${uniswapV2Factory.address}`)
+  // 获取当下uniswapV2中已经有多少对交易对并输出
   const uniAllPairsLength = await uniswapV2Factory.allPairsLength()
   console.log(`Uniswap Factory number of pairs: ${uniAllPairsLength}`)
 
+  // 获取当前deployer的eth余额
   deployerETHBalance = await ethers.provider.getBalance(deployerWallet.address)
   console.log(`deployer's ETH balance before deployments: ${deployerETHBalance}`)
 
-  // Deploy core logic contracts
+  // 部署liquity项目核心合约，并更新部署信息deploymentState
   const liquityCore = await mdh.deployLiquityCoreMainnet(configParams.externalAddrs.TELLOR_MASTER, deploymentState)
+  // 等部署完毕且交易上链后，输出已部署的合约信息
   await mdh.logContractObjects(liquityCore)
 
-  // Check Uniswap Pair LUSD-ETH pair before pair creation
+  // 要先检查lusd和weth的交易对是否已经存在于uniswapV2中
   let LUSDWETHPairAddr = await uniswapV2Factory.getPair(liquityCore.lusdToken.address, configParams.externalAddrs.WETH_ERC20)
   let WETHLUSDPairAddr = await uniswapV2Factory.getPair(configParams.externalAddrs.WETH_ERC20, liquityCore.lusdToken.address)
+  // lusd-weth 和 weth-lusd 得到pair地址应该是一直的
   assert.equal(LUSDWETHPairAddr, WETHLUSDPairAddr)
 
 
+  // 如果lusd-weth的pair地址为0，表示uniswapV2中还没有为该比对创建交易对
   if (LUSDWETHPairAddr == th.ZERO_ADDRESS) {
-    // Deploy Unipool for LUSD-WETH
+    // 调用uniswapV2的factory合约的createPair方法来为以上比对创建交易对
     await mdh.sendAndWaitForTransaction(uniswapV2Factory.createPair(
       configParams.externalAddrs.WETH_ERC20,
       liquityCore.lusdToken.address,
       { gasPrice }
     ))
 
-    // Check Uniswap Pair LUSD-WETH pair after pair creation (forwards and backwards should have same address)
+    // 再次获取lusd-weth的pair地址（此时应该已经有了）
     LUSDWETHPairAddr = await uniswapV2Factory.getPair(liquityCore.lusdToken.address, configParams.externalAddrs.WETH_ERC20)
+    // 此时必须不为零值，因为已经创建完交易对了
     assert.notEqual(LUSDWETHPairAddr, th.ZERO_ADDRESS)
+    // weth-lusd反过来再取一次pair地址
     WETHLUSDPairAddr = await uniswapV2Factory.getPair(configParams.externalAddrs.WETH_ERC20, liquityCore.lusdToken.address)
     console.log(`LUSD-WETH pair contract address after Uniswap pair creation: ${LUSDWETHPairAddr}`)
+    // 两次去的地址应该是一样的（uniswapV2的内部逻辑控制，这里不表）
     assert.equal(WETHLUSDPairAddr, LUSDWETHPairAddr)
   }
 
-  // Deploy Unipool
+  // 部署流动性挖矿的unipool。reward token是lqty、抵押lp为weth/lusd
   const unipool = await mdh.deployUnipoolMainnet(deploymentState)
 
-  // Deploy LQTY Contracts
+  // 部署lqty合约
   const LQTYContracts = await mdh.deployLQTYContractsMainnet(
-    configParams.liquityAddrs.GENERAL_SAFE, // bounty address
-    unipool.address,  // lp rewards address
-    configParams.liquityAddrs.LQTY_SAFE, // multisig LQTY endowment address
+    // bounty和hackathon支付lqty地址（配置文件中）
+    configParams.liquityAddrs.GENERAL_SAFE,
+    // unipool地址（流动性挖矿的lqty是最开始直接将lqty分配进去的）
+    unipool.address,
+    // lqty的多签地址（用于社区运作，以写入配置文件）
+    configParams.liquityAddrs.LQTY_SAFE,
     deploymentState,
   )
 
-  // Connect all core contracts up
+  // 完成所有的合约之间的相互写入和关联
   await mdh.connectCoreContractsMainnet(liquityCore, LQTYContracts, configParams.externalAddrs.CHAINLINK_ETHUSD_PROXY)
   await mdh.connectLQTYContractsMainnet(LQTYContracts)
   await mdh.connectLQTYContractsToCoreMainnet(LQTYContracts, liquityCore)
 
-  // Deploy a read-only multi-trove getter
+  // 部署MultiTroveGetter合约
   const multiTroveGetter = await mdh.deployMultiTroveGetterMainnet(liquityCore, deploymentState)
 
-  // Connect Unipool to LQTYToken and the LUSD-WETH pair address, with a 6 week duration
+  // unipool的头矿时长为6周
   const LPRewardsDuration = timeVals.SECONDS_IN_SIX_WEEKS
+  // 设置unipool
   await mdh.connectUnipoolMainnet(unipool, LQTYContracts, LUSDWETHPairAddr, LPRewardsDuration)
 
-  // Log LQTY and Unipool addresses
+  // 输出lqty和unipool地址
   await mdh.logContractObjects(LQTYContracts)
   console.log(`Unipool address: ${unipool.address}`)
   
   // let latestBlock = await ethers.provider.getBlockNumber()
+  // 获取lqty抵押池的start time。（注：抵押lusd可以挖lqty的生效时间）
   let deploymentStartTime = await LQTYContracts.lqtyToken.getDeploymentStartTime()
-
+  // 输出
   console.log(`deployment start time: ${deploymentStartTime}`)
+  // 计算一年后的时间戳
   const oneYearFromDeployment = (Number(deploymentStartTime) + timeVals.SECONDS_IN_ONE_YEAR).toString()
+  // 输出
   console.log(`time oneYearFromDeployment: ${oneYearFromDeployment}`)
 
-  // Deploy LockupContracts - one for each beneficiary
+  // 下面是部署lockupContracts（有34个一级投资人地址，对数释放lqty）
   const lockupContracts = {}
 
   for (const [investor, investorAddr] of Object.entries(configParams.beneficiaries)) {
+    // 从配置文件中读出34个地址
     const lockupContractEthersFactory = await ethers.getContractFactory("LockupContract", deployerWallet)
     if (deploymentState[investor] && deploymentState[investor].address) {
+      // 每个lock释放地址都会记录到合约部署信息中（可见记录合约部署信息的文件）
+      // 如果已经在合约部署信息文件中，将该地址封装成ether.js的contract对象并添加到lockupContracts中
       console.log(`Using previously deployed ${investor} lockup contract at address ${deploymentState[investor].address}`)
       lockupContracts[investor] = new ethers.Contract(
         deploymentState[investor].address,
@@ -120,25 +143,32 @@ async function mainnetDeploy(configParams) {
         deployerWallet
       )
     } else {
+      // 如果还没有写到合约部署文件中
+      // 发交易将该地址写进lockupContract中，从一年后开始启动对数释放
+      // lockupContract会为每一个investor创建一个新的子合约，用于释放逻辑
       const txReceipt = await mdh.sendAndWaitForTransaction(LQTYContracts.lockupContractFactory.deployLockupContract(investorAddr, oneYearFromDeployment, { gasPrice }))
 
+      // 从receipt中的event中获取新创建的子合约地址
       const address = await txReceipt.logs[0].address // The deployment event emitted from the LC itself is is the first of two events, so this is its address 
+      // 封装成ethers.js对象并添加到lockupContracts中
       lockupContracts[investor] = new ethers.Contract(
         address,
         lockupContractEthersFactory.interface,
         deployerWallet
       )
 
+      // 更新合约部署信息deploymentState
       deploymentState[investor] = {
         address: address,
         txHash: txReceipt.transactionHash
       }
 
+      // deploymentState更新到文件中
       mdh.saveDeployment(deploymentState)
     }
 
     const lqtyTokenAddr = LQTYContracts.lqtyToken.address
-    // verify
+    // lqty代币合约的代码验证
     if (configParams.ETHERSCAN_BASE_URL) {
       await mdh.verifyContract(investor, deploymentState, [lqtyTokenAddr, investorAddr, oneYearFromDeployment])
     }
