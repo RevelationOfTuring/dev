@@ -68,7 +68,7 @@ const beneficiaries = {
   ACCOUNT_34: "0x895870D281E4761237f4465AFb51D16c3e124EFC"
 }
 
-// 如果是已经部署过的，那么各合约的地址记录（可中断式部署）
+// 合约部署后会将相关地址信息以json形式输出，输出文件地址
 const OUTPUT_FILE = './mainnetDeployment/mainnetDeploymentOutput.json'
 
 // 超时等待——90s

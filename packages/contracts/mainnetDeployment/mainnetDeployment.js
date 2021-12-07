@@ -1,15 +1,25 @@
+// 从abis载入UniswapV2Factory实体
 const { UniswapV2Factory } = require("./ABIs/UniswapV2Factory.js")
+// 从abis载入UniswapV2Pair实体
 const { UniswapV2Pair } = require("./ABIs/UniswapV2Pair.js")
+// 从abis载入UniswapV2Router02实体
 const { UniswapV2Router02 } = require("./ABIs/UniswapV2Router02.js")
+// 从abis载入Chainlink聚合器接口实体（用于从读eth/usd的报价）
 const { ChainlinkAggregatorV3Interface } = require("./ABIs/ChainlinkAggregatorV3Interface.js")
+// 一些本地写的测试工具集
 const { TestHelper: th, TimeValues: timeVals } = require("../utils/testHelpers.js")
 const { dec } = th
+// 一些本地写的部署工具集
 const MainnetDeploymentHelper = require("../utils/mainnetDeploymentHelpers.js")
 const toBigNum = ethers.BigNumber.from
 
+// 真正的部署细节逻辑函数定义
 async function mainnetDeploy(configParams) {
+  // 当下时间
   const date = new Date()
+  // utc格式输出时间
   console.log(date.toUTCString())
+  // 利用第一个账户来部署合约
   const deployerWallet = (await ethers.getSigners())[0]
   // const account2Wallet = (await ethers.getSigners())[1]
   const mdh = new MainnetDeploymentHelper(configParams, deployerWallet)
