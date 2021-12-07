@@ -47,6 +47,7 @@ const deployLiquity = async () => {
   return contracts
 }
 
+// 结构传入参数，取出各个已部署合约的地址并结构化返回
 const getAddresses = (contracts) => {
   return {
     BorrowerOperations: contracts.borrowerOperations.address,
@@ -61,19 +62,19 @@ const getAddresses = (contracts) => {
   }
 }
 
-// Connect contracts to their dependencies
+// 调用各个已部署的合约，并调用他们里面的一些写函数，将其他交互合约的地址set进去。即关联各个合约。
 const connectContracts = async (contracts, addresses) => {
-  // set TroveManager addr in SortedTroves
+  // TroveManager合约地址写进SortedTroves合约
   await contracts.sortedTroves.setTroveManager(addresses.TroveManager)
 
   // set contract addresses in the FunctionCaller 
   await contracts.functionCaller.setTroveManagerAddress(addresses.TroveManager)
   await contracts.functionCaller.setSortedTrovesAddress(addresses.SortedTroves)
 
-  // set TroveManager addr in PriceFeed
+  // TroveManager合约地址写进PriceFeed合约
   await contracts.priceFeedTestnet.setTroveManagerAddress(addresses.TroveManager)
 
-  // set contracts in the Trove Manager
+  // 设置TroveManager合约（诸多地址，通过调用TroveManager合约的写函数设置）
   await contracts.troveManager.setLUSDToken(addresses.LUSDToken)
   await contracts.troveManager.setSortedTroves(addresses.SortedTroves)
   await contracts.troveManager.setPriceFeed(addresses.PriceFeedTestnet)
@@ -82,20 +83,22 @@ const connectContracts = async (contracts, addresses) => {
   await contracts.troveManager.setStabilityPool(addresses.StabilityPool)
   await contracts.troveManager.setBorrowerOperations(addresses.BorrowerOperations)
 
-  // set contracts in BorrowerOperations 
+  // 设置BorrowerOperations合约（诸多地址，通过调用BorrowerOperations合约的写函数设置）
   await contracts.borrowerOperations.setSortedTroves(addresses.SortedTroves)
   await contracts.borrowerOperations.setPriceFeed(addresses.PriceFeedTestnet)
   await contracts.borrowerOperations.setActivePool(addresses.ActivePool)
   await contracts.borrowerOperations.setDefaultPool(addresses.DefaultPool)
   await contracts.borrowerOperations.setTroveManager(addresses.TroveManager)
 
-  // set contracts in the Pools
+  // 设置StabilityPool合约（诸多地址，通过调用StabilityPool合约的写函数设置）
   await contracts.stabilityPool.setActivePoolAddress(addresses.ActivePool)
   await contracts.stabilityPool.setDefaultPoolAddress(addresses.DefaultPool)
 
+  // 设置ActivePool合约（诸多地址，通过调用ActivePool合约的写函数设置）
   await contracts.activePool.setStabilityPoolAddress(addresses.StabilityPool)
   await contracts.activePool.setDefaultPoolAddress(addresses.DefaultPool)
 
+  // 设置DefaultPool合约（诸多地址，通过调用DefaultPool合约的写函数设置）
   await contracts.defaultPool.setStabilityPoolAddress(addresses.StabilityPool)
   await contracts.defaultPool.setActivePoolAddress(addresses.ActivePool)
 }
