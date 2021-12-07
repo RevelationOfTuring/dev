@@ -1,22 +1,36 @@
+// 部署需要用到的一些外部项目的相关地址
 const externalAddrs  = {
+  // chainlink预言机的eth价格获取地址
   // https://data.chain.link/eth-usd
-  CHAINLINK_ETHUSD_PROXY: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419", 
+  CHAINLINK_ETHUSD_PROXY: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+
+  // tellor预言机的eth价格获取地址
   // https://docs.tellor.io/tellor/integration/reference-page
   TELLOR_MASTER:"0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0",
+
+  // uniswap v2相关地址
   // https://uniswap.org/docs/v2/smart-contracts/factory/
+  // uniswap v2的factory地址
   UNISWAP_V2_FACTORY: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+  // uniswap v2的router地址
   UNISWAP_V2_ROUTER02: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+
+  // WETH地址
   // https://etherscan.io/token/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
   WETH_ERC20: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
 }
 
+// 一些业务上的地址
 const liquityAddrs = {
+  // 用于接收LQTY的地址1：该地址负责支付bounties和hackathon相关的奖励
   GENERAL_SAFE:"0xF06016D822943C42e3Cb7FC3a6A3B1889C1045f8", // to be passed to LQTYToken as the bounties/hackathons address
+  // 该地址是个多签地址，用于接收LQTY
   LQTY_SAFE:"0xb8a9faDA75c6d891fB77a7988Ff9BaD9e485Ca1C", // to be passed to LQTYToken as the LQTY multisig address
+  // 合约部署者地址
   DEPLOYER: "0xa850535D3628CD4dFEB528dC85cfA93051Ff2984" // Mainnet REAL deployment address
 }
 
-// Beneficiaries for lockup contracts. 
+// Liquity项目的代币LQTY有一部分是指数级释放给投资人和社区的，这里是这些接收LQTY代币的地址
 const beneficiaries = {
   ACCOUNT_1: "0xBBdc88676759D09617C288E29f2Eb7Ce94592f25",  
   ACCOUNT_2: "0x77616b3a57C9ACf018E87c92ae187C8Cc0B112D6",
@@ -54,25 +68,39 @@ const beneficiaries = {
   ACCOUNT_34: "0x895870D281E4761237f4465AFb51D16c3e124EFC"
 }
 
+// 合约部署后会将相关地址信息以json形式输出，输出文件地址
 const OUTPUT_FILE = './mainnetDeployment/mainnetDeploymentOutput.json'
 
+// 超时等待——90s
 const delay = ms => new Promise(res => setTimeout(res, ms));
 const waitFunction = async () => {
   return delay(90000) // wait 90s
 }
 
+// gas price值——25gwei
 const GAS_PRICE = 25000000000
+
+// 3个confirmation认为交易无法回滚
 const TX_CONFIRMATIONS = 3 // for mainnet
 
+// etherscan浏览器的base url
 const ETHERSCAN_BASE_URL = 'https://etherscan.io/address'
 
 module.exports = {
+  // 依赖的外部项目的地址集合
   externalAddrs,
+  // liquity一些业务上涉及到的地址集合
   liquityAddrs,
+  // 指数级释放LQTY代币的代币接收地址
   beneficiaries,
+  // 如果是已经部署过的，那么各合约的地址记录（
   OUTPUT_FILE,
+  // 超时等待函数
   waitFunction,
+  // gas price
   GAS_PRICE,
+  // tx的规定confirmation值
   TX_CONFIRMATIONS,
+  // etherscan浏览器的base url
   ETHERSCAN_BASE_URL,
 };
